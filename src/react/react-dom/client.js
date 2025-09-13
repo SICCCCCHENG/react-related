@@ -16,6 +16,13 @@ function createDOM(vdom) {
     // 如果这个虚拟dom类型是一个文本节点 string number
     if (type === REACT_TEXT) {
         dom = document.createTextNode(props);
+    } else if (typeof type == 'function') {
+        // 类本身也是函数
+        if (type.isReactComponent) {
+            return mountClassComponent(vdom);
+        } else {
+            return mountFunctionComponent(vdom);
+        }
     } else {
         dom = document.createElement(type);//原生组件
     }
@@ -32,6 +39,19 @@ function createDOM(vdom) {
         }
     }
     return dom;
+}
+
+function mountFunctionComponent(vdom) {
+    const { type, props } = vdom;//FunctionComponent  {title:'world'}
+    const renderVdom = type(props);
+    return createDOM(renderVdom);
+}
+
+function mountClassComponent(vdom) {
+    const { type: ClassComponent, props } = vdom;
+    const classInstance = new ClassComponent(props);//class ClassComponent
+    const renderVdom = classInstance.render();
+    return createDOM(renderVdom);
 }
 
 function reconcileChildren(childrenVdom, parentDOM) {

@@ -1,5 +1,7 @@
 import { wrapToVdom } from './utils'
 import { REACT_ELEMENT } from './constant';
+import { Component } from './Component'
+
 /**
  * 根据参数，返回一个React元素
  * @param {*} type 元素的类型 div span
@@ -36,6 +38,7 @@ function createElement(type, config, children) {
 }
 
 const React = {
-    createElement
+    createElement,
+    Component
 }
 export default React
