@@ -1,7 +1,6 @@
 import React from '../react/react';
-// import ReactDOM from 'react-dom/client';
+import ReactDOM from '../react/react-dom/client';
 
-debugger
 let element = (
     <div className='title' style={{ color: 'red' }}>
         <span>hello</span>
@@ -9,11 +8,21 @@ let element = (
     </div>
 )
 
+// 等价于
+// let element = React.createElement("div", {
+//   className: "title",
+//   style: {
+//     color: 'red'
+//   }
+// }, React.createElement("span", null, "hello"));
+
 console.log(element);
 
+debugger
 // 创建真实dom Root
-// const root = ReactDOM.createRoot(document.getElementById('root'));
-// root.render(element);
+const root = ReactDOM.createRoot(document.getElementById('root'));
+debugger
+root.render(element);
 
 /*
 
