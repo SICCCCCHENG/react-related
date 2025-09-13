@@ -1,5 +1,17 @@
 import { findDOM, compareTwoVdom } from './react-dom/client';
 
+//这是一个更新队列
+export let updateQueue = {
+    isBatchingUpdate: false, //这是一个是否是批量更新的标识,默认是非批量的，是同步的
+    updaters: new Set(),//更新的集合
+    batchUpdate() {
+        updateQueue.isBatchingUpdate = false;
+        for (const updater of updateQueue.updaters) {
+            updater.updateComponent();
+        }
+        updateQueue.updaters.clear();
+    }
+}
 class Updater {
     //每个更新器会保存一个组件类的实例
     constructor(classInstance) {
@@ -25,7 +37,13 @@ class Updater {
         this.emitUpdate();
     }
     emitUpdate(nextProps) {
-        this.updateComponent();
+        // 如果需要批量更新
+        if (updateQueue.isBatchingUpdate) {
+            //则不要直接更新组件，而是先把更新器添加到updaters里去进行暂存
+            updateQueue.updaters.add(this);
+        } else {
+            this.updateComponent();
+        }
     }
     updateComponent() {
         //获取等待 生效的状态数组和类的实例
@@ -85,13 +103,14 @@ export class Component {
         //比较新旧虚拟DOM的差异，把更新后的结果放在真实DOM上
         compareTwoVdom(oldDOM.parentNode, oldRenderVdom, newRenderVdom);
 
+
         //在更新后需要把oldRenderVdom更新为新的newRenderVdom
         // 第一次挂载 老的div#counter
         // 第一次更新的时候 新的div#counter
         // replaceChild  div#root>新的div#counter
         //它永远指向当前父DOM节点当前的子DOM节点
         this.oldRenderVdom = newRenderVdom;
-           
+
         this.updater.flushCallbacks();
     }
 }

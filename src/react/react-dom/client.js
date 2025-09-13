@@ -84,7 +84,11 @@ function updateProps(dom, oldProps = {}, newProps = {}) {
             }
         } else if (/^on[A-Z].*/.test(key)) {
             // dom.onclick = handleClick 转为onclick
-            dom[key.toLowerCase()]=newProps[key];
+            dom[key.toLowerCase()] = newProps[key];
+            // 源码中是将其指向undefined
+            // dom[key.toLowerCase()] = (args) => {
+            //     newProps[key].apply(undefined, args)
+            // };
         } else {
             //如果是其它属性，则直接赋值
             // 在HTML中，CSS类的属性名是 class，但在JavaScript DOM对象中，由于 class 是保留关键字，所以使用 className 作为DOM属性名。
@@ -103,7 +107,7 @@ function updateProps(dom, oldProps = {}, newProps = {}) {
 export function findDOM(vdom) {//Class Counter虚拟DOM {type:Counter,classInstance:CounterInstance}
     if (!vdom) return null;
     //如果vdom对应原生组件的的话肯定有dom属性指向真实DOM
-    if(vdom.dom){
+    if (vdom.dom) {
         return vdom.dom;
     }
 }
