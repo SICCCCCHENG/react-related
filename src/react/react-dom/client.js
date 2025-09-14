@@ -1,5 +1,5 @@
 import { REACT_TEXT } from '../constant'
-
+import { addEvent } from '../event.js'
 function mount(vdom, container) {
     //传进去虚拟DOM，返回真实DOM
     const newDOM = createDOM(vdom);
@@ -82,13 +82,15 @@ function updateProps(dom, oldProps = {}, newProps = {}) {
             for (const attr in styleObject) {
                 dom.style[attr] = styleObject[attr];
             }
-        } else if (/^on[A-Z].*/.test(key)) {
-            // dom.onclick = handleClick 转为onclick
-            dom[key.toLowerCase()] = newProps[key];
+        } else if (/^on[A-Z].*/.test(key)) {  // 创建虚拟dom是从里向外生成  生成真实dom是从外到里生成
+            // // dom.onclick = handleClick 转为onclick
+            // dom[key.toLowerCase()] = newProps[key];
             // 源码中是将其指向undefined
-            // dom[key.toLowerCase()] = (args) => {
-            //     newProps[key].apply(undefined, args)
-            // };
+            // // dom[key.toLowerCase()] = (args) => {
+            // //     newProps[key].apply(undefined, args)
+            // // };
+            addEvent(dom, key, newProps[key]);
+            // addEvent(dom, key.toLowerCase(), newProps[key]);
         } else {
             //如果是其它属性，则直接赋值
             // 在HTML中，CSS类的属性名是 class，但在JavaScript DOM对象中，由于 class 是保留关键字，所以使用 className 作为DOM属性名。
@@ -123,6 +125,7 @@ export function compareTwoVdom(parentDOM, oldVdom, newVdom, nextDOM) {
     let oldDOM = findDOM(oldVdom)
     let newDOM = createDOM(newVdom)
     parentDOM.replaceChild(newDOM, oldDOM)
+
 }
 
 class DOMRoot {
