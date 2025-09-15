@@ -1,4 +1,4 @@
-import { REACT_TEXT } from '../constant'
+import { REACT_TEXT, REACT_FORWARD_REF_TYPE } from '../constant'
 import { addEvent } from '../event.js'
 function mount(vdom, container) {
     //传进去虚拟DOM，返回真实DOM
@@ -10,11 +10,12 @@ function mount(vdom, container) {
 
 //把虚拟DOM变成真实的DOM
 function createDOM(vdom) {
-    const { type, props } = vdom;
+    const { type, props, ref } = vdom;
     let dom;
 
-    // 如果这个虚拟dom类型是一个文本节点 string number
-    if (type === REACT_TEXT) {
+    if (type && type.$$typeof === REACT_FORWARD_REF_TYPE) {
+        return mountForwardComponent(vdom);
+    } else if (type === REACT_TEXT) { // 如果这个虚拟dom类型是一个文本节点 string number
         dom = document.createTextNode(props);
     } else if (typeof type == 'function') {
         // 类本身也是函数
@@ -40,7 +41,17 @@ function createDOM(vdom) {
     }
     //在根据虚拟DOM创建真实DOM成功后，就可以建立关系
     vdom.dom = dom;
+    //如果此虚拟DOM上有ref属性，则把ref.current的值赋成真实DOM
+    if (ref) ref.current = dom;
     return dom;
+}
+
+function mountForwardComponent(vdom) {
+    const { type, props, ref } = vdom;
+    //type.render=就是TextInput
+    const renderVdom = type.render(props, ref);
+    vdom.oldRenderVdom = renderVdom;
+    return createDOM(renderVdom);
 }
 
 function mountFunctionComponent(vdom) {
@@ -51,12 +62,14 @@ function mountFunctionComponent(vdom) {
 }
 
 function mountClassComponent(vdom) {
-    const { type: ClassComponent, props } = vdom;
+    const { type: ClassComponent, props, ref } = vdom;
     const classInstance = new ClassComponent(props);//class ClassComponent
+    if (ref) ref.current = classInstance;
     const renderVdom = classInstance.render();
     //在获取render的渲染结果后把此结果放到classInstance.oldRenderVdom进行暂存
     classInstance.oldRenderVdom = renderVdom;
     return createDOM(renderVdom);
+
 }
 
 function reconcileChildren(childrenVdom, parentDOM) {
