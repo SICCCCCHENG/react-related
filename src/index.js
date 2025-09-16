@@ -8,4 +8,5 @@
 // import './7_ref/2_组件ref'
 // import './7_ref/3_函数组件ref'
 
-import './8_生命周期'
+// import './8_生命周期'
+import './8_生命周期/DOM-DIFF'

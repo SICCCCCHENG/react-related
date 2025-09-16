@@ -36,6 +36,7 @@ function createDOM(vdom) {
         if (props.children) {
             //如果是独生子的话，把独生子的虚拟DOM转换真实DOM插入到DOM节点上
             if (typeof props.children === 'object' && props.children.type) {
+                props.children.mountIndex = 0;
                 mount(props.children, dom);
             } else if (Array.isArray(props.children)) {
                 reconcileChildren(props.children, dom);
@@ -85,7 +86,6 @@ function mountClassComponent(vdom) {
         dom.componentDidMount = classInstance.componentDidMount.bind(classInstance);
     }
     return dom;
-
 }
 
 function reconcileChildren(childrenVdom, parentDOM) {
@@ -199,7 +199,6 @@ export function compareTwoVdom(parentDOM, oldVdom, newVdom, nextDOM) {
  * @param {*} newVdom 新的虚拟DOM
  */
 function updateElement(oldVdom, newVdom) {
-
     if (oldVdom.type === REACT_TEXT) {
         //复用老DOM节点
         let currentDOM = newVdom.dom = findDOM(oldVdom);
@@ -252,15 +251,93 @@ function updateFunctionComponent(oldVdom, newVdom) {
  * @param {*} newVChildren 新的子虚拟DOM
  */
 function updateChildren(parentDOM, oldVChildren, newVChildren) {
-    oldVChildren = (Array.isArray(oldVChildren) ? oldVChildren : [oldVChildren]).filter(Boolean);
-    newVChildren = (Array.isArray(newVChildren) ? newVChildren : [newVChildren]).filter(Boolean);
-    // 获取第二个儿子数组的最大长度
-    let maxLength = Math.max(oldVChildren.length, newVChildren.length);
-    for (let i = 0; i < maxLength; i++) {
-        let nextVdom = oldVChildren.find((item, index) => index > i && item && findDOM(item));
-        compareTwoVdom(parentDOM, oldVChildren[i], newVChildren[i], nextVdom && findDOM(nextVdom));
-    }
+    oldVChildren = (Array.isArray(oldVChildren) ? oldVChildren : [oldVChildren]);
+    newVChildren = (Array.isArray(newVChildren) ? newVChildren : [newVChildren]);
 
+    // 获取第二个儿子数组的最大长度
+    // let maxLength = Math.max(oldVChildren.length, newVChildren.length);
+    // for (let i = 0; i < maxLength; i++) {
+    //     let nextVdom = oldVChildren.find((item, index) => index > i && item && findDOM(item));
+    //     compareTwoVdom(parentDOM, oldVChildren[i], newVChildren[i], nextVdom && findDOM(nextVdom));
+    // }
+
+    //存放老节点的map
+    const keyedOldMap = {}
+    //上一个放置好的，不需要移动元素的索引
+    let lastPlacedIndex = -1;
+    oldVChildren.forEach((oldVChild, index) => {
+        //如果用户提供了key就用用户提供的key,否则就使用index索引
+        let oldKey = (oldVChild.key) ? oldVChild.key : index;
+        keyedOldMap[oldKey] = oldVChild;
+    })
+    //创建一个补丁包，存放将要进行的操作
+    let patch = [];
+    //遍历新的虚拟DOM数组
+    newVChildren.forEach((newVChild, index) => {
+        newVChild.mountIndex = index;
+        let newKey = newVChild.key ? newVChild.key : index;
+        //用新的key去老的map中找找有没有可复用的虚拟DOM
+        let oldVChild = keyedOldMap[newKey];
+        //如果找到了就可以进行复用了
+        if (oldVChild) {
+            //如果找到了就直接进行更新
+            updateElement(oldVChild, newVChild);
+            //再判断此节点是否需要移动
+            //如果此可复用的老节点的挂载索引比上一个不需要移动的节点的索引要小的话，那就需要移动 
+            if (oldVChild.mountIndex < lastPlacedIndex) {// 1 < 4
+                patch.push({
+                    type: 'MOVE',
+                    oldVChild,//移动老B 1
+                    newVChild,
+                    mountIndex: index //3
+                });
+            }
+            //把可以复用的老的虚拟DOM节点从map中删除
+            delete keyedOldMap[newKey];
+            //更新lastPlacedIndex为老的lastPlacedIndex和oldVChild.mountIndex中的较大值
+            lastPlacedIndex = Math.max(lastPlacedIndex, oldVChild.mountIndex);
+        } else {
+            patch.push({
+                type: 'PLACEMENT',
+                newVChild,
+                mountIndex: index
+            });
+        }
+    });
+    //执行patch中的操作
+    //获取所有需要移动的元素 ['B']
+    const moveVChildren = patch.filter(action => action.type === 'MOVE').map(action => action.oldVChild);
+    //获取所有留在map中的老的虚拟DOM加上移动的老的虚拟DOM
+    //直接从老的真实DOM中删除 D F B
+    Object.values(keyedOldMap).concat(moveVChildren).forEach(oldVChild => {
+        let currentDOM = findDOM(oldVChild);
+        parentDOM.removeChild(currentDOM);
+    });
+    //patch =[{type:'MOVE',B},{type:'PLACEMENT',G}]
+    patch.forEach(action => {
+        const { type, oldVChild, newVChild, mountIndex } = action;
+        let oldTrueDOMs = parentDOM.childNodes;//获取老的真实DOM的集合[A,C,E]
+        if (type === 'PLACEMENT') {
+            //先根据新的虚拟DOM创建新的真实DOM
+            let newDOM = createDOM(newVChild);
+            const oldTrueDOM = oldTrueDOMs[mountIndex];
+            if (oldTrueDOM) {
+                //如果要挂载的索引处有真实DOM，就是插到它的前面
+                parentDOM.insertBefore(newDOM, oldTrueDOM);
+            } else {
+                parentDOM.appendChild(newDOM);
+            }
+        } else if (type === 'MOVE') {
+            let oldDOM = findDOM(oldVChild);//B真实DOM
+            let oldTrueDOM = oldTrueDOMs[mountIndex];//获取挂载索引处现在的真实DOM
+            if (oldTrueDOM) {
+                //如果要挂载的索引处有真实DOM，就是插到它的前面
+                parentDOM.insertBefore(oldDOM, oldTrueDOM);
+            } else {
+                parentDOM.appendChild(oldDOM);
+            }
+        }
+    });
 }
 
 function unMountVdom(vdom) {
