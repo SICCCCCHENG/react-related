@@ -84,7 +84,7 @@ function shouldUpdate(classInstance, nextProps, nextState) {
     if (willUpdate && classInstance.UNSAFE_componentWillUpdate) {
         classInstance.UNSAFE_componentWillUpdate();
     }
- 
+
     // 不管最终要不要更新页面上的组件，都会把新的状态传送给classInstance.state
     // 先把计算的新状态 赋值给 类的实例
     // 此处应该是给了 子类 的 state
@@ -115,14 +115,24 @@ export class Component {
         //获取老的虚拟DOM div#counter
         let oldRenderVdom = this.oldRenderVdom;
 
+        // 获取到此组件对应的老的真实DOM，才的DIV
+        const oldDOM = findDOM(oldRenderVdom);
+
+        const { getDerivedStateFromProps } = this.constructor;
+        if (getDerivedStateFromProps) { //可以替代掉以前componentWillReceiveProps
+            let newState = getDerivedStateFromProps(this.props, this.state);
+            if (newState) {
+                this.state = { ...this.state, ...newState };
+            }
+        }
+
         //根据新的状态计算新的虚拟DOM
         let newRenderVdom = this.render();
 
-        // 获取到此组件对应的老的真实DOM，才的DIV
-        const oldDOM = findDOM(oldRenderVdom);
+        let snapshot = this.getSnapshotBeforeUpdate && this.getSnapshotBeforeUpdate();
+
         //比较新旧虚拟DOM的差异，把更新后的结果放在真实DOM上
         compareTwoVdom(oldDOM.parentNode, oldRenderVdom, newRenderVdom);
-
 
         //在更新后需要把oldRenderVdom更新为新的newRenderVdom
         // 第一次挂载 老的div#counter
@@ -134,7 +144,7 @@ export class Component {
         this.updater.flushCallbacks();
 
         if (this.componentDidUpdate) {
-            this.componentDidUpdate(this.props, this.state);
+            this.componentDidUpdate(this.props, this.state, snapshot);
         }
     }
 }

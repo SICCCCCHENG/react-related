@@ -9,4 +9,6 @@
 // import './7_ref/3_函数组件ref'
 
 // import './8_生命周期'
-import './8_生命周期/DOM-DIFF'
+// import './8_生命周期/DOM-DIFF'
+// import './8_生命周期/getDerivedStateFromProps'
+import './8_生命周期/getSnapshotBeforeUpdate'
