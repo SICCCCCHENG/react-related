@@ -118,6 +118,10 @@ export class Component {
         // 获取到此组件对应的老的真实DOM，才的DIV
         const oldDOM = findDOM(oldRenderVdom);
 
+        if (this.constructor.contextType) {
+            this.context = this.constructor.contextType._currentValue;
+        }
+
         const { getDerivedStateFromProps } = this.constructor;
         if (getDerivedStateFromProps) { //可以替代掉以前componentWillReceiveProps
             let newState = getDerivedStateFromProps(this.props, this.state);

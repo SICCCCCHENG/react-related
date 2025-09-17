@@ -1,4 +1,4 @@
-import { REACT_TEXT, REACT_FORWARD_REF_TYPE } from '../constant'
+import { REACT_TEXT, REACT_FORWARD_REF_TYPE, REACT_PROVIDER, REACT_CONTEXT } from '../constant'
 import { addEvent } from '../event.js'
 function mount(vdom, container) {
     //传进去虚拟DOM，返回真实DOM
@@ -16,7 +16,11 @@ function createDOM(vdom) {
     const { type, props, ref } = vdom;
     let dom;
 
-    if (type && type.$$typeof === REACT_FORWARD_REF_TYPE) {
+    if (type && type.$$typeof === REACT_CONTEXT) {
+        return mountConsumerComponent(vdom);
+    } else if (type && type.$$typeof === REACT_PROVIDER) {
+        return mountProviderComponent(vdom);
+    } else if (type && type.$$typeof === REACT_FORWARD_REF_TYPE) {
         return mountForwardComponent(vdom);
     } else if (type === REACT_TEXT) { // 如果这个虚拟dom类型是一个文本节点 string number
         dom = document.createTextNode(props);
@@ -50,6 +54,25 @@ function createDOM(vdom) {
     return dom;
 }
 
+function mountProviderComponent(vdom) {
+    const { type, props } = vdom;
+    const context = type._context;
+    context._currentValue = props.value;
+    let renderVdom = props.children;
+    if (!renderVdom) return null;
+    vdom.oldRenderVdom = renderVdom;
+    return createDOM(renderVdom)
+}
+
+function mountConsumerComponent(vdom) {
+    const { type, props } = vdom;
+    const context = type._context;
+    const renderVdom = props.children(context._currentValue);
+    if (!renderVdom) return null;
+    vdom.oldRenderVdom = renderVdom;
+    return createDOM(renderVdom)
+}
+
 function mountForwardComponent(vdom) {
     const { type, props, ref } = vdom;
     //type.render=就是TextInput
@@ -70,6 +93,11 @@ function mountClassComponent(vdom) {
     var defaultProps = ClassComponent.defaultProps;
     var resolvedProps = { ...defaultProps, ...props }
     const classInstance = new ClassComponent(resolvedProps);//class ClassComponent
+
+    if (ClassComponent.contextType) {
+        classInstance.context = ClassComponent.contextType._currentValue;
+    }
+
     // 让虚拟dom的classInstance属性指向此类的实例
     vdom.classInstance = classInstance;
     if (ref) ref.current = classInstance;
@@ -86,6 +114,7 @@ function mountClassComponent(vdom) {
         dom.componentDidMount = classInstance.componentDidMount.bind(classInstance);
     }
     return dom;
+
 }
 
 function reconcileChildren(childrenVdom, parentDOM) {
@@ -199,7 +228,12 @@ export function compareTwoVdom(parentDOM, oldVdom, newVdom, nextDOM) {
  * @param {*} newVdom 新的虚拟DOM
  */
 function updateElement(oldVdom, newVdom) {
-    if (oldVdom.type === REACT_TEXT) {
+   
+    if (oldVdom.type.$$typeof === REACT_PROVIDER) {
+        updateProviderComponent(oldVdom, newVdom);
+    } else if (oldVdom.type.$$typeof === REACT_CONTEXT) {
+        updateContextComponent(oldVdom, newVdom);
+    } else if (oldVdom.type === REACT_TEXT) {   //如果新老的虚拟DOM都是文本节点的话
         //复用老DOM节点
         let currentDOM = newVdom.dom = findDOM(oldVdom);
         if (oldVdom.props !== newVdom.props) {
@@ -219,6 +253,27 @@ function updateElement(oldVdom, newVdom) {
             updateFunctionComponent(oldVdom, newVdom);//如果是函数组件的话
         }
     }
+}
+
+function updateProviderComponent(oldVdom, newVdom) {
+    //先获取父DOM节点
+    let parentDOM = findDOM(oldVdom).parentNode;
+    let { type, props } = newVdom;
+    let context = type._context;
+    context._currentValue = props.value;
+    let renderVdom = props.children;
+    compareTwoVdom(parentDOM, oldVdom.oldRenderVdom, renderVdom);
+    newVdom.oldRenderVdom = renderVdom;
+}
+
+function updateContextComponent(oldVdom, newVdom) {
+    //先获取父DOM节点
+    let parentDOM = findDOM(oldVdom).parentNode;
+    let { type, props } = newVdom;
+    let context = type._context;
+    let renderVdom = props.children(context._currentValue);
+    compareTwoVdom(parentDOM, oldVdom.oldRenderVdom, renderVdom);
+    newVdom.oldRenderVdom = renderVdom;
 }
 
 function updateClassComponent(oldVdom, newVdom) {

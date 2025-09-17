@@ -11,4 +11,6 @@
 // import './8_生命周期'
 // import './8_生命周期/DOM-DIFF'
 // import './8_生命周期/getDerivedStateFromProps'
-import './8_生命周期/getSnapshotBeforeUpdate'
+// import './8_生命周期/getSnapshotBeforeUpdate'
+
+import './11_context'

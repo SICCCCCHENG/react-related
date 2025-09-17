@@ -4,3 +4,6 @@ export const REACT_ELEMENT = Symbol('react.element');
 export const REACT_TEXT = Symbol('react.text');
 //代表转发的函数组件类型
 export const REACT_FORWARD_REF_TYPE = Symbol('react.forward_ref');
+
+export const REACT_PROVIDER = Symbol('react.provider');
+export const REACT_CONTEXT = Symbol('react.context');

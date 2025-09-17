@@ -1,5 +1,5 @@
 import { wrapToVdom } from './utils'
-import { REACT_ELEMENT, REACT_FORWARD_REF_TYPE } from './constant';
+import { REACT_ELEMENT, REACT_FORWARD_REF_TYPE, REACT_PROVIDER, REACT_CONTEXT } from './constant';
 import { Component } from './Component'
 
 /**
@@ -42,17 +42,32 @@ function createRef() {
 }
 
 //其实函数组件本质上就是render方法，就是接收属性，返回react元素
-function forwardRef(render){
-   return {
-    $$typeof:REACT_FORWARD_REF_TYPE,
-    render // 其实就是原来的函数组件那个函数
-   }
+function forwardRef(render) {
+    return {
+        $$typeof: REACT_FORWARD_REF_TYPE,
+        render // 其实就是原来的函数组件那个函数
+    }
+}
+
+function createContext() {
+    //_currentValue代表当前的值
+    let context = { _currentValue: undefined };
+    context.Provider = {
+        $$typeof: REACT_PROVIDER,//供应商
+        _context: context
+    };
+    context.Consumer = {
+        $$typeof: REACT_CONTEXT,//上下文
+        _context: context
+    }
+    return context;
 }
 
 const React = {
     createElement,
     Component,
     createRef,
-    forwardRef
+    forwardRef,
+    createContext,
 }
 export default React
