@@ -1,5 +1,5 @@
-import { wrapToVdom } from './utils'
-import { REACT_ELEMENT, REACT_FORWARD_REF_TYPE, REACT_PROVIDER, REACT_CONTEXT } from './constant';
+import { wrapToVdom, shallowEqual } from './utils'
+import { REACT_ELEMENT, REACT_FORWARD_REF_TYPE, REACT_PROVIDER, REACT_CONTEXT, REACT_MEMO } from './constant';
 import { Component } from './Component'
 
 /**
@@ -77,12 +77,29 @@ function cloneElement(element, newProps, children) {
     }
 }
 
+class PureComponent extends Component {
+    //重写scu方法，如果属性变了或者状态变以就会返回true,如果都没变才会返回false
+    shouldComponentUpdate(newProps, nextState) {
+        return !shallowEqual(this.props, newProps) || !shallowEqual(this.state, nextState)
+    }
+}
+
+function memo(type, compare = shallowEqual) {
+    return {
+        $$typeof: REACT_MEMO,
+        type,//函数组件
+        compare//比较方法
+    }
+}
+
 const React = {
     createElement,
     Component,
     createRef,
     forwardRef,
     createContext,
-    cloneElement
+    cloneElement,
+    PureComponent,
+    memo
 }
 export default React

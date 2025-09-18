@@ -1,4 +1,4 @@
-import { REACT_TEXT, REACT_FORWARD_REF_TYPE, REACT_PROVIDER, REACT_CONTEXT } from '../constant'
+import { REACT_TEXT, REACT_FORWARD_REF_TYPE, REACT_PROVIDER, REACT_CONTEXT, REACT_MEMO } from '../constant'
 import { addEvent } from '../event.js'
 function mount(vdom, container) {
     //传进去虚拟DOM，返回真实DOM
@@ -15,8 +15,9 @@ function mount(vdom, container) {
 function createDOM(vdom) {
     const { type, props, ref } = vdom;
     let dom;
-
-    if (type && type.$$typeof === REACT_CONTEXT) {
+    if (type && type.$$typeof === REACT_MEMO) {
+        return mountMemoComponent(vdom);
+    } else if (type && type.$$typeof === REACT_CONTEXT) {
         return mountConsumerComponent(vdom);
     } else if (type && type.$$typeof === REACT_PROVIDER) {
         return mountProviderComponent(vdom);
@@ -54,6 +55,14 @@ function createDOM(vdom) {
     return dom;
 }
 
+function mountMemoComponent(vdom) {
+    const { type: { type: functionComponent }, props } = vdom;
+    const renderVdom = functionComponent(props);
+    if (!renderVdom) return null;
+    vdom.oldRenderVdom = renderVdom;
+    return createDOM(renderVdom);
+}
+
 function mountProviderComponent(vdom) {
     const { type, props } = vdom;
     const context = type._context;
@@ -77,6 +86,7 @@ function mountForwardComponent(vdom) {
     const { type, props, ref } = vdom;
     //type.render=就是TextInput
     const renderVdom = type.render(props, ref);
+    if (!renderVdom) return null;
     vdom.oldRenderVdom = renderVdom;
     return createDOM(renderVdom);
 }
@@ -84,6 +94,7 @@ function mountForwardComponent(vdom) {
 function mountFunctionComponent(vdom) {
     const { type, props } = vdom;//FunctionComponent  {title:'world'}
     const renderVdom = type(props);
+    if(!renderVdom) return null;
     vdom.oldRenderVdom = renderVdom;
     return createDOM(renderVdom);
 }
@@ -105,6 +116,8 @@ function mountClassComponent(vdom) {
         classInstance.UNSAFE_componentWillMount();
     }
     const renderVdom = classInstance.render();
+    if(!renderVdom) return null;
+
     //在获取render的渲染结果后把此结果放到classInstance.oldRenderVdom进行暂存
     classInstance.oldRenderVdom = renderVdom;
 
@@ -228,8 +241,10 @@ export function compareTwoVdom(parentDOM, oldVdom, newVdom, nextDOM) {
  * @param {*} newVdom 新的虚拟DOM
  */
 function updateElement(oldVdom, newVdom) {
-   
-    if (oldVdom.type.$$typeof === REACT_PROVIDER) {
+
+    if (oldVdom.type.$$typeof === REACT_MEMO) {
+        updateMemoComponent(oldVdom, newVdom);
+    } else if (oldVdom.type.$$typeof === REACT_PROVIDER) {
         updateProviderComponent(oldVdom, newVdom);
     } else if (oldVdom.type.$$typeof === REACT_CONTEXT) {
         updateContextComponent(oldVdom, newVdom);
@@ -252,6 +267,21 @@ function updateElement(oldVdom, newVdom) {
         } else {
             updateFunctionComponent(oldVdom, newVdom);//如果是函数组件的话
         }
+    }
+}
+
+function updateMemoComponent(oldVdom, newVdom) {
+    let { type: { compare, type: functionComponent } } = oldVdom;
+    //比较新的和老的属性对象，如果是一样的，就不render
+    if (compare(oldVdom.props, newVdom.props)) {
+        //则不重新渲染，直接复用老的渲染的虚拟DOM
+        newVdom.oldRenderVdom = oldVdom.oldRenderVdom;
+    } else {
+        const oldDOM = findDOM(oldVdom);
+        const parentDOM = oldDOM.parentNode;
+        const renderVdom = functionComponent(newVdom.props)
+        compareTwoVdom(parentDOM, oldVdom.oldRenderVdom, renderVdom);
+        newVdom.oldRenderVdom = renderVdom;
     }
 }
 
@@ -306,8 +336,8 @@ function updateFunctionComponent(oldVdom, newVdom) {
  * @param {*} newVChildren 新的子虚拟DOM
  */
 function updateChildren(parentDOM, oldVChildren, newVChildren) {
-    oldVChildren = (Array.isArray(oldVChildren) ? oldVChildren : [oldVChildren]);
-    newVChildren = (Array.isArray(newVChildren) ? newVChildren : [newVChildren]);
+    oldVChildren = (Array.isArray(oldVChildren) ? oldVChildren : oldVChildren ? [oldVChildren] : []);
+    newVChildren = (Array.isArray(newVChildren) ? newVChildren : newVChildren ? [newVChildren] : []);
 
     // 获取第二个儿子数组的最大长度
     // let maxLength = Math.max(oldVChildren.length, newVChildren.length);
@@ -428,6 +458,9 @@ function createRoot(container) {
 }
 const ReactDOM = {
     createRoot,
+    createPortal: function (vdom, container) {  // 基本不用
+        mount(vdom, container);
+    }
 }
 
 export default ReactDOM;
