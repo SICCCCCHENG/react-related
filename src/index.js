@@ -13,4 +13,9 @@
 // import './8_生命周期/getDerivedStateFromProps'
 // import './8_生命周期/getSnapshotBeforeUpdate'
 
-import './11_context'
+// import './11_context'
+
+// import './12_render.props/1_属性代理'
+// import './12_render.props/2_反向继承'
+// import './12_render.props/3.1_renderprops'
+import './12_render.props/4_decorator'
