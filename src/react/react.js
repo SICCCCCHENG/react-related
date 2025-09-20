@@ -1,6 +1,7 @@
 import { wrapToVdom, shallowEqual } from './utils'
 import { REACT_ELEMENT, REACT_FORWARD_REF_TYPE, REACT_PROVIDER, REACT_CONTEXT, REACT_MEMO } from './constant';
 import { Component } from './Component'
+import * as hooks from './react-dom/client';
 
 /**
  * 根据参数，返回一个React元素
@@ -100,6 +101,9 @@ const React = {
     createContext,
     cloneElement,
     PureComponent,
-    memo
+    memo,
+    ...hooks
 }
+
+export * from './react-dom/client';
 export default React

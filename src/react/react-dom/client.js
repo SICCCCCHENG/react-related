@@ -1,5 +1,13 @@
 import { REACT_TEXT, REACT_FORWARD_REF_TYPE, REACT_PROVIDER, REACT_CONTEXT, REACT_MEMO } from '../constant'
 import { addEvent } from '../event.js'
+
+// if while for 不可以使用hooks, 都不行因为可能会把索引乱掉
+
+// 在源码里，每个函数组件都有自己的独立的hookIndex 和hookStates
+let hookStates = []; //[0,{myFocus},{current:input},0] 4个元素
+let hookIndex = 0; 
+let scheduleUpdate;
+
 function mount(vdom, container) {
     //传进去虚拟DOM，返回真实DOM
     const newDOM = createDOM(vdom);
@@ -8,6 +16,102 @@ function mount(vdom, container) {
         if (newDOM.componentDidMount) {
             newDOM.componentDidMount()
         }
+    }
+}
+
+
+export function useReducer(reducer, initialState) {
+    const oldState = hookStates[hookIndex] = hookStates[hookIndex] || initialState;
+    const currentIndex = hookIndex;
+    function dispatch(action) {
+        // let newState = reducer(oldState, action);
+        let newState = reducer ? reducer(oldState, action) : typeof action === 'function' ? action(oldState) : action;
+        hookStates[currentIndex] = newState;
+        scheduleUpdate();
+    }
+    return [hookStates[hookIndex++], dispatch];
+}
+
+export function useState(initialState) {
+    return useReducer(null, initialState);
+    // const oldState = hookStates[hookIndex] = hookStates[hookIndex] || initialState;
+    // const currentIndex = hookIndex;
+    // function setState(action) {
+    //     let newState = typeof action === 'function' ? action(oldState) : action;
+    //     hookStates[currentIndex] = newState;
+    //     scheduleUpdate();
+    // }
+    // return [hookStates[hookIndex++], setState];
+}
+
+export function useMemo(factory, deps) {
+    //第一次挂载的时候，肯定值是空的
+    if (hookStates[hookIndex]) {
+        let [lastMemo, lastDeps] = hookStates[hookIndex];
+        let same = deps.every((item, index) => item === lastDeps[index]);
+        if (same) {//新的依赖数组和老的依赖数组完全 相等
+            hookIndex++;
+            return lastMemo;
+        } else {
+            const newMemo = factory();
+            hookStates[hookIndex++] = [newMemo, deps];
+            return newMemo;
+        }
+    } else {
+        const newMemo = factory();
+        hookStates[hookIndex++] = [newMemo, deps];
+        return newMemo;
+    }
+}
+
+export function useCallback(callback, deps) {
+    //第一次挂载的时候，肯定值是空的
+    if (hookStates[hookIndex]) {
+        let [lastCallback, lastDeps] = hookStates[hookIndex];
+        let same = deps.every((item, index) => item === lastDeps[index]);
+        if (same) {//新的依赖数组和老的依赖数组完全 相等
+            hookIndex++;
+            return lastCallback;
+        } else {
+            hookStates[hookIndex++] = [callback, deps];
+            return callback;
+        }
+    } else {
+        hookStates[hookIndex++] = [callback, deps];
+        return callback;
+    }
+}
+
+// 专门为函数组件设计
+export function useContext(context) {
+    return context._currentValue;
+}
+
+export function useEffect(callback, deps) {
+    const currentIndex = hookIndex;
+    if (hookStates[currentIndex]) {
+        let [destroy, lastDeps] = hookStates[hookIndex];
+        let same = deps && deps.every((item, index) => item === lastDeps[index]);
+        if (same) {
+            hookIndex++;
+        } else {
+            destroy?.();
+            // 开启新的宏任务
+            // useEffect 开启了一个宏任务，因为它要等到DOM渲染到页面之后，也就是页面绘制之后执行
+            // useLayoutEffect是相当于一个微任务，会在页面绘制前执行
+            setTimeout(() => {
+                // 执行callback,保存返回的destroy销毁函数
+                hookStates[currentIndex] = [callback(), deps];
+            });
+            hookIndex++;
+        }
+    } else {
+        // 模拟宏任务
+        setTimeout(() => {
+            //执行callback,保存返回的destroy销毁函数
+            hookStates[currentIndex] = [callback(), deps];
+        });
+        hookIndex++;
     }
 }
 
@@ -94,7 +198,7 @@ function mountForwardComponent(vdom) {
 function mountFunctionComponent(vdom) {
     const { type, props } = vdom;//FunctionComponent  {title:'world'}
     const renderVdom = type(props);
-    if(!renderVdom) return null;
+    if (!renderVdom) return null;
     vdom.oldRenderVdom = renderVdom;
     return createDOM(renderVdom);
 }
@@ -116,7 +220,7 @@ function mountClassComponent(vdom) {
         classInstance.UNSAFE_componentWillMount();
     }
     const renderVdom = classInstance.render();
-    if(!renderVdom) return null;
+    if (!renderVdom) return null;
 
     //在获取render的渲染结果后把此结果放到classInstance.oldRenderVdom进行暂存
     classInstance.oldRenderVdom = renderVdom;
@@ -450,6 +554,13 @@ class DOMRoot {
     }
     render(vdom) {
         mount(vdom, this.container);
+        scheduleUpdate = () => {
+            hookIndex = 0;
+            // 容器 老的vdom 新的vdom
+            // 两个vdom是由于两次执行后的vdom不一样
+            // 每次更新从根节点开始更新
+            compareTwoVdom(this.container, vdom, vdom);
+        }
     }
 }
 
