@@ -27,4 +27,9 @@
 // import './14_hooks/2_useCallback&useMemo'
 // import './14_hooks/3_useReducer'
 // import './14_hooks/4_useContext'
-import './14_hooks/5_useEffect'
+// import './14_hooks/5_useEffect'
+
+// import './14_hooks/6_useLayoutEffect&useRef'
+// import './14_hooks/7_useImperativeHandle'
+// import './14_hooks/7.2_forwardRef_转发子组件状态更新'
+import './14_hooks/8.newValue-获取最新的值'

@@ -5,7 +5,7 @@ import { addEvent } from '../event.js'
 
 // 在源码里，每个函数组件都有自己的独立的hookIndex 和hookStates
 let hookStates = []; //[0,{myFocus},{current:input},0] 4个元素
-let hookIndex = 0; 
+let hookIndex = 0;
 let scheduleUpdate;
 
 function mount(vdom, container) {
@@ -113,6 +113,43 @@ export function useEffect(callback, deps) {
         });
         hookIndex++;
     }
+}
+
+export function useLayoutEffect(callback, deps) {
+    const currentIndex = hookIndex;
+    if (hookStates[currentIndex]) {
+        let [destroy, lastDeps] = hookStates[hookIndex];
+        let same = deps && deps.every((item, index) => item === lastDeps[index]);
+        if (same) {
+            hookIndex++;
+        } else {
+            destroy?.();
+            queueMicrotask(() => {//queue宏任务 setTimeout模拟
+                //执行callback,保存返回的destroy销毁函数
+                hookStates[currentIndex] = [callback(), deps];
+            });
+            hookIndex++;
+        }
+    } else {
+        queueMicrotask(() => {
+            //执行callback,保存返回的destroy销毁函数
+            hookStates[currentIndex] = [callback(), deps];
+        });
+        hookIndex++;
+    }
+}
+
+export function useRef(initialState) {
+    hookStates[hookIndex] = hookStates[hookIndex] || { current: initialState };
+    return hookStates[hookIndex++];
+}
+
+// 第二个参数为什么设计成函数,为啥不是对象
+// 1.可以传参
+// 2.可以动态执行，获取最新的外界参数
+// 3.可以实现闭包的变量
+export function useImperativeHandle(ref, handler) {
+    ref.current = handler()
 }
 
 //把虚拟DOM变成真实的DOM
@@ -346,7 +383,9 @@ export function compareTwoVdom(parentDOM, oldVdom, newVdom, nextDOM) {
  */
 function updateElement(oldVdom, newVdom) {
 
-    if (oldVdom.type.$$typeof === REACT_MEMO) {
+    if (oldVdom.type.$$typeof === REACT_FORWARD_REF_TYPE) {
+        updateForwardComponent(oldVdom, newVdom);
+    } else if (oldVdom.type.$$typeof === REACT_MEMO) {
         updateMemoComponent(oldVdom, newVdom);
     } else if (oldVdom.type.$$typeof === REACT_PROVIDER) {
         updateProviderComponent(oldVdom, newVdom);
@@ -372,6 +411,20 @@ function updateElement(oldVdom, newVdom) {
             updateFunctionComponent(oldVdom, newVdom);//如果是函数组件的话
         }
     }
+}
+
+function updateForwardComponent(oldVdom, newVdom) {
+    let currentDOM = findDOM(oldVdom);
+    if (!currentDOM) return;
+    //获取当前的真实DOM的父节点
+    let parentDOM = currentDOM.parentNode;
+    //重新执行函数获取新的虚拟DOM
+    const { type, props, ref } = newVdom;//FunctionComponent  {title:'world'}
+    const newRenderVdom = type.render(props, ref);
+    //比较新旧虚拟DOM
+    compareTwoVdom(parentDOM, oldVdom.oldRenderVdom, newRenderVdom);
+    //还要把newRenderVdom保存起来
+    newVdom.oldRenderVdom = newRenderVdom;
 }
 
 function updateMemoComponent(oldVdom, newVdom) {
